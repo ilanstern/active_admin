@@ -6,7 +6,7 @@
     f.inputs do
       resource.class.authentication_keys.each { |key| f.input key, :input_html => {:autofocus => true}}
       f.input :password
-      f.input :captcha, :as => :simple_captcha
+      f.form_buffers.last << "<li><label class='label'>Captcha</label>#{captcha_tag}</li>".html_safe
     end
     f.actions do
       f.action :submit, :label => t('active_admin.devise.login.submit'), :button_html => { :value => t('active_admin.devise.login.submit') }
