@@ -147,7 +147,7 @@ describe ActiveAdmin::Filters::ViewHelper do
     end
   end
 
-  describe "text attribute, as a select" do
+  describe "string attribute, as a select" do
     let(:body) { filter :title, as: :select }
     let(:builder) { ActiveAdmin::Inputs::FilterSelectInput }
 
@@ -308,34 +308,32 @@ describe ActiveAdmin::Filters::ViewHelper do
   end
 
   describe "conditional display" do
-
-    context "with :if block" do
-      let(:body) do
-        filter :body,   :if => proc{true}
-        filter :author, :if => proc{false}
-      end
-
-      it "should be displayed if true" do
-        body.should have_tag("input", :attributes => { :name => "q[body_contains]"})
-      end
-
-      it "should NOT be displayed if false" do
-        body.should_not have_tag("input", :attributes => { :name => "q[author_id_eq]"})
-      end
-    end
-
-    context "with :unless block" do
-      let(:body) do
-        filter :created_at, :unless => proc{false}
-        filter :updated_at, :unless => proc{true}
-      end
-
-      it "should be displayed if false" do
-        body.should have_tag("input", :attributes => { :name => "q[created_at_gte]"})
-      end
-
-      it "should NOT be displayed if true" do
-        body.should_not have_tag("input", :attributes => { :name => "q[updated_at_gte]"})
+    [:if, :unless].each do |verb|
+      should   = verb == :if ? "should"     : "shouldn't"
+      if_true  = verb == :if ? :should      : :should_not
+      if_false = verb == :if ? :should_not  : :should
+      context "with #{verb.inspect} proc" do
+        it "#{should} be displayed if true" do
+          body = filter :body, verb => proc{ true }
+          body.send if_true, have_tag("input", attributes: {name: "q[body_contains]"})
+        end
+        it "#{should} be displayed if false" do
+          body = filter :body, verb => proc{ false }
+          body.send if_false, have_tag("input", attributes: {name: "q[body_contains]"})
+        end
+        it "should still be hidden on the second render" do
+          filters = [attribute: :body, verb => proc{ verb == :unless }]
+          2.times do
+            body = render_filter scope, filters
+            body.should_not have_tag "input", attributes: {name: "q[body_contains]"}
+          end
+        end
+        it "should successfully keep rendering other filters after one is hidden" do
+          filters = [{attribute: :body, verb => proc{ verb == :unless }}, {attribute: :author}]
+          body    = render_filter scope, filters
+          body.should_not have_tag "input",  attributes: {name: "q[body_contains]"}
+          body.should     have_tag "select", attributes: {name: "q[author_id_eq]"}
+        end
       end
     end
   end
@@ -347,9 +345,29 @@ describe ActiveAdmin::Filters::ViewHelper do
       body.should have_tag "select", attributes: { name: "q[custom_searcher]" }
     end
 
-    pending "should work as string" do
+    it "should work as string" do
       body = filter :custom_searcher, as: :string
       body.should have_tag "input", attributes: { name: "q[custom_searcher]" }
+    end
+  end
+
+  describe "blank option" do
+    context "for a select filter" do
+      it "should be there by default" do
+        filter(:author).should have_tag "option", "Any"
+      end
+      it "should be able to be disabled" do
+        filter(:author, include_blank: false).should_not have_tag "option", "Any"
+      end
+    end
+
+    context "for a multi-select filter" do
+      it "should not be there by default" do
+        filter(:author, multiple: true).should_not have_tag "option", "Any"
+      end
+      it "should be able to be enabled" do
+        filter(:author, multiple: true, include_blank: true).should have_tag "option", "Any"
+      end
     end
   end
 
